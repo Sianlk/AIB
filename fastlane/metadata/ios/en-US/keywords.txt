@@ -1,1 +1,1 @@
-AI platform,language models,AI agents,quantum AI,computer vision,AGI
+AI,aibplatform,automation,platform,mobile
