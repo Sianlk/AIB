@@ -1,8 +1,7 @@
 // AI Workforce Agent — AIB Platform
 // Autonomous AI worker for business automation
 
-import { aiComplete, domainChat, AIMessage } from '../services/ai';
-import AI_CONFIG from '../config/ai.config';
+import { aiComplete, AIMessage } from '../services/ai';
 
 export type AgentStatus = 'idle' | 'thinking' | 'working' | 'done' | 'error';
 
@@ -21,111 +20,55 @@ export interface AgentResult {
   actions: string[];
 }
 
-// Specialised AI agents for business automation
-const AGENT_PERSONAS = {
+const PERSONAS = {
   analyst: {
     name: 'AIB Platform Analyst',
-    role: `Expert business automation analyst with deep knowledge of workflow AI, business intelligence, RPA, process automation.`,
-    capabilities: ["Workflow AI", "Business Intelligence", "RPA Engine", "Process Automation", "AI Reports"],
+    role: `Expert business automation analyst. Capabilities: workflow AI, business intelligence, RPA, process automation.`,
   },
   advisor: {
     name: 'AIB Platform Advisor',
     role: `Senior business automation advisor providing strategic recommendations.`,
-    capabilities: ['Strategic planning', 'Risk assessment', 'Optimization'],
   },
   automator: {
     name: 'AIB Platform Automator',
     role: `Autonomous business automation task executor and workflow manager.`,
-    capabilities: ['Task automation', 'Workflow orchestration', 'Process optimisation'],
   },
 };
 
 export class AIWorkforceAgent {
-  private persona: keyof typeof AGENT_PERSONAS;
-  private conversationHistory: AIMessage[] = [];
-  private status: AgentStatus = 'idle';
-  private taskQueue: AgentTask[] = [];
+  private persona: keyof typeof PERSONAS;
+  private history: AIMessage[] = [];
+  private _status: AgentStatus = 'idle';
 
-  constructor(persona: keyof typeof AGENT_PERSONAS = 'analyst') {
+  constructor(persona: keyof typeof PERSONAS = 'analyst') {
     this.persona = persona;
   }
 
-  getStatus(): AgentStatus { return this.status; }
+  get status(): AgentStatus { return this._status; }
 
   async executeTask(task: AgentTask): Promise<AgentResult> {
-    this.status = 'thinking';
-    const p = AGENT_PERSONAS[this.persona];
-
-    const systemPrompt = `You are ${p.name}, an AI workforce agent.
-Role: ${p.role}
-Capabilities: ${p.capabilities.join(', ')}
-Domain: business automation
-
-When executing tasks:
-1. Reason step-by-step
-2. Provide confidence score (0-1)
-3. List concrete actions taken
-4. Return structured JSON output`;
-
-    const userPrompt = `Task ID: ${task.id}
-Task Type: ${task.type}
-Input: ${task.input}
-Context: ${JSON.stringify(task.context ?? {})}
-
-Execute this task and respond with JSON:
-{"output":"result","confidence":0.9,"reasoning":"...","actions":["..."]}`;
-
-    this.status = 'working';
-
+    this._status = 'thinking';
+    const p = PERSONAS[this.persona];
+    const systemPrompt = `You are ${p.name}.\nRole: ${p.role}\n\nRespond with JSON: {"output":"...","confidence":0.9,"reasoning":"...","actions":["..."]}`; 
+    const userPrompt = `Task: ${task.type}\nInput: ${task.input}`;
+    this._status = 'working';
     const response = await aiComplete([
       { role: 'system', content: systemPrompt },
-      ...this.conversationHistory,
+      ...this.history,
       { role: 'user', content: userPrompt },
     ]);
-
-    this.conversationHistory.push(
-      { role: 'user', content: userPrompt },
-      { role: 'assistant', content: response.content }
-    );
-
-    // Keep history bounded
-    if (this.conversationHistory.length > 20) {
-      this.conversationHistory = this.conversationHistory.slice(-20);
-    }
-
-    this.status = 'done';
-
+    this.history.push({ role: 'user', content: userPrompt }, { role: 'assistant', content: response.content });
+    if (this.history.length > 20) this.history = this.history.slice(-20);
+    this._status = 'done';
     try {
-      const parsed = JSON.parse(response.content);
-      return { taskId: task.id, ...parsed };
+      return { taskId: task.id, ...JSON.parse(response.content) };
     } catch {
-      return {
-        taskId: task.id,
-        output: response.content,
-        confidence: 0.7,
-        reasoning: 'Direct response',
-        actions: ['Processed input', 'Generated response'],
-      };
+      return { taskId: task.id, output: response.content, confidence: 0.7, reasoning: 'Direct response', actions: ['Processed'] };
     }
   }
 
-  async orchestrate(tasks: AgentTask[]): Promise<AgentResult[]> {
-    const results: AgentResult[] = [];
-    for (const task of tasks) {
-      const result = await this.executeTask(task);
-      results.push(result);
-    }
-    return results;
-  }
-
-  reset() {
-    this.conversationHistory = [];
-    this.status = 'idle';
-  }
+  reset() { this.history = []; this._status = 'idle'; }
 }
 
-// Convenience factory
-export const createAgent = (persona: keyof typeof AGENT_PERSONAS = 'analyst') =>
-  new AIWorkforceAgent(persona);
-
+export const createAgent = (p: keyof typeof PERSONAS = 'analyst') => new AIWorkforceAgent(p);
 export default AIWorkforceAgent;
