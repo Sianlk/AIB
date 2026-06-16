@@ -42,7 +42,7 @@ aiohttp==3.10.10
 prometheus-client==0.21.0
 sentry-sdk[fastapi]==2.14.0
 opentelemetry-api==1.27.0
-opentelemetry-sdk==1.27.0
+opentelemetry-sdk==1.40.0
 opentelemetry-instrumentation-fastapi==0.48b0
 
 # Storage
